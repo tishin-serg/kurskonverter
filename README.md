@@ -140,27 +140,27 @@ Image: `ghcr.io/<owner>/<repository>` (lowercase). Tags: `v1.2.3`, `1.2.3`, `1.2
 
 ## Подготовка VPS и GitHub
 
-Linux VPS: Docker Engine, Compose v2, Bash, flock, SSH. Пользователь deploy должен иметь Docker access (это привилегированный доступ к хосту). Подготовьте `/opt/kurskonverter`, скопируйте **только** `deploy/compose.yaml` как `compose.yaml` и создайте `.env` на VPS. Repository и Go compiler серверу не нужны. Restrict .env mode 600; ограничьте SSH и не открывайте 8080 во внешний интернет.
+Linux VPS: Docker Engine, Compose v2, Bash, flock, SSH. Пользователь `kursdeploy` получает только forced command для деплоя; настройка — в GITHUB_SETUP.md. Docker group и общий sudo запрещены. Подготовьте `/opt/kurskonverter`, скопируйте **только** `deploy/compose.yaml` как `compose.yaml` и создайте `.env` на VPS. Repository и Go compiler серверу не нужны. Restrict .env mode 600; ограничьте SSH и не открывайте 8080 во внешний интернет.
 
 Создайте GitHub Environment `production`, ограничьте разрешённые deployment branches/tags, по желанию включите reviewers. Secrets:
 
 | Secret | Значение |
 |---|---|
 | VDS_HOST | DNS/IP VPS |
-| VDS_USER | SSH deploy user |
+| VDS_USER | Только `kursdeploy` |
 | VDS_SSH_PRIVATE_KEY | выделенный private SSH key |
 | VDS_PORT | SSH port, default 22 |
 | VDS_KNOWN_HOSTS | проверенный host key в known_hosts формате, включая `[host]:port` при нестандартном порте |
 
 Проверяйте fingerprint по доверенному каналу. Workflow не использует `StrictHostKeyChecking=no` или автоматическое доверие ssh-keyscan.
 
-GHCR login использует краткоживущий GITHUB_TOKEN с packages:read через SSH stdin, logout после deploy. Для private package предоставьте repository Actions read access к package. Для ручного pull private image используйте отдельный token с read:packages и `--password-stdin`; не записывайте его в Compose или git. App credentials находятся только в VPS .env, не передаются в Docker build.
+Сервер скачивает публичный GHCR package без токена. Для private package администратор отдельно настраивает read-only registry credential. App credentials находятся только в VPS .env, не передаются в Docker build.
 
 ## Deploy и rollback
 
 `deploy.yml` вызывается после успешной публикации release; есть workflow_dispatch с exact digest и версией. `environment: production`, `concurrency: production`, cancel-in-progress=false. На VPS дополнительный flock защищает от одновременного ручного deploy.
 
-Процесс: проверить digest текущего repository → SSH registry login → pull → сохранить `previous-image` → Compose up → дождаться Docker health и `bot healthcheck ready` → атомарно записать `current-image`. Проверки ограничены 24 попытками по 5 секунд. Job summary содержит image version, image commit label, digest и результат. Сервер не делает git pull и не компилирует код.
+Процесс: проверить digest текущего repository → ограниченная SSH-команда → pull → сохранить `previous-image` → Compose up → дождаться Docker health и `bot healthcheck ready` → атомарно записать `current-image`. Проверки ограничены 24 попытками по 5 секунд. Job summary содержит image version, image commit label, digest и результат. Сервер не делает git pull и не компилирует код.
 
 Если pull падает, текущий контейнер не меняется. Если новая версия не запускается/не готова, script восстанавливает предыдущий exact image, снова проверяет здоровье и завершает workflow ошибкой. Если предыдущего image нет, останавливает неудачный первый deploy. Провал rollback выводит требование вмешательства. Миграции должны быть backward compatible; автоматического отката данных нет.
 
