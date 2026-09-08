@@ -1,8 +1,8 @@
 .env
-.env.*
-!.env.example
 .cache/
 bin/
 dist/
 *.db*
 coverage*
+.env.*
+!.env.example

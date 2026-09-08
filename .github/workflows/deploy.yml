@@ -1,0 +1,103 @@
+name: Deploy
+on:
+  workflow_call:
+    inputs:
+      image:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Exact ghcr.io/owner/repository@sha256:digest from release image.txt'
+        required: true
+        type: string
+      version:
+        description: 'Release version (audit label)'
+        required: true
+        type: string
+permissions:
+  contents: read
+  packages: read
+concurrency:
+  group: kurskonverter-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check deployment configuration
+        id: config
+        env:
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+          VDS_USER: ${{ secrets.VDS_USER }}
+          VDS_SSH_PRIVATE_KEY: ${{ secrets.VDS_SSH_PRIVATE_KEY }}
+          VDS_KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+        run: |
+          missing=()
+          for key in VDS_HOST VDS_USER VDS_SSH_PRIVATE_KEY VDS_KNOWN_HOSTS; do
+            [[ -n "${!key}" ]] || missing+=("$key")
+          done
+          if (( ${#missing[@]} )); then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            printf 'Deployment skipped: configure secrets %s, prepare /opt/kurskonverter, then run CI/CD on main.\n' "${missing[*]}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Configure SSH
+        if: steps.config.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.VDS_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Deploy exact image
+        if: steps.config.outputs.ready == 'true'
+        id: deploy
+        env:
+          IMAGE: ${{ inputs.image }}
+          HOST: ${{ secrets.VDS_HOST }}
+          USER: ${{ secrets.VDS_USER }}
+          PORT: ${{ secrets.VDS_PORT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_USER: ${{ github.actor }}
+        run: |
+          [[ "$IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
+          expected="ghcr.io/${GITHUB_REPOSITORY,,}@sha256:"
+          [[ "$IMAGE" == "$expected"* ]]
+          [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          [[ "$GH_USER" =~ ^[a-zA-Z0-9_-]+$ ]]
+          PORT=${PORT:-22}
+          [[ "$PORT" =~ ^[0-9]+$ ]]
+          ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "$PORT")
+          printf '%s' "$GH_TOKEN" | ssh "${ssh_args[@]}" "$USER@$HOST" "docker login ghcr.io -u '$GH_USER' --password-stdin" > /dev/null
+          trap 'ssh "${ssh_args[@]}" "$USER@$HOST" "docker logout ghcr.io" >/dev/null 2>&1 || true' EXIT
+          ssh "${ssh_args[@]}" "$USER@$HOST" "bash -s -- '$IMAGE'" < deploy/deploy.sh
+          commit=$(ssh "${ssh_args[@]}" "$USER@$HOST" "docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' '$IMAGE'")
+          [[ "$commit" =~ ^[a-f0-9]{40}$ ]]
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Deployment summary
+        if: always()
+        env:
+          IMAGE: ${{ inputs.image }}
+          VERSION: ${{ inputs.version }}
+          RESULT: ${{ steps.deploy.outcome }}
+          COMMIT: ${{ steps.deploy.outputs.commit }}
+        run: |
+          {
+            printf 'Version: %s\n\nImage commit: %s\n\nImage: %s\n\nResult: %s\n' "$VERSION" "${COMMIT:-unavailable}" "$IMAGE" "$RESULT"
+            printf '\nHealth + ready: %s (success requires both; failure attempts rollback)\n' "$RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove SSH identity
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
+
