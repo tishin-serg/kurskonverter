@@ -86,12 +86,16 @@ func (u *UI) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 		return
 	}
 	text := strings.TrimSpace(m.Text)
+	if text == "/rate" || strings.HasPrefix(text, "/rate ") {
+		u.rateCommand(ctx, b, user, chat, text)
+		return
+	}
 	if text == "/banks" || text == "/settings" {
 		u.bankMenu(ctx, b, user, chat, "", 0)
 		return
 	}
 	if text == "/start" || text == "/help" {
-		u.send(ctx, b, chat, "Отправьте количество BTC для получения на внешний адрес: 0.01 BTC.\n/settings — способ оплаты.\nРасчёт учитывает стакан и комиссии; выполнение сделок ботом не производится.", nil)
+		u.send(ctx, b, chat, "Отправьте количество BTC для получения на внешний адрес: 0.01 BTC.\nИли задайте /rate 7000000 и отправьте 5000 руб — рассчитаю BTC-эквивалент и стоимость покупки.\n/settings — банк и личный курс BTC/RUB.\nРасчёт учитывает стакан и комиссии; выполнение сделок ботом не производится.", nil)
 		return
 	}
 	if strings.HasPrefix(text, "/settings") {
@@ -125,7 +129,7 @@ func (u *UI) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	u.quote(ctx, b, user, chat, text)
 }
 func (u *UI) quote(ctx context.Context, b *bot.Bot, user, chat int64, text string) {
-	target, e := ParseAmount(text)
+	target, equivalent, e := u.requestAmount(ctx, user, text)
 	if e != nil {
 		u.send(ctx, b, chat, e.Error(), nil)
 		return
@@ -148,6 +152,7 @@ func (u *UI) quote(ctx context.Context, b *bot.Bot, user, chat int64, text strin
 		return
 	}
 	r := u.Engine.Calculate(ctx, target, u.Market.Read(), f, time.Now())
+	r.Equivalent = equivalent
 	id, e := u.Storage.Save(ctx, user, target.String(), r)
 	if e != nil {
 		u.send(ctx, b, chat, "Не удалось сохранить расчёт. Повторите запрос.", nil)
@@ -179,6 +184,10 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 	if q.From.ID != chat {
 		return
 	}
+	if q.Data == "rate" {
+		u.rateCommand(ctx, b, q.From.ID, chat, "/rate")
+		return
+	}
 	if q.Data == "banks" || strings.HasPrefix(q.Data, "banks:") || strings.HasPrefix(q.Data, "bankset:") {
 		u.bankCallback(ctx, b, q.From.ID, chat, q.Data)
 		return
@@ -197,6 +206,9 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 		return
 	}
 	if parts[0] == "r" && len(parts) == 2 {
+		if r.Equivalent != nil {
+			target = r.Equivalent.RUB.String() + " RUB"
+		}
 		u.quote(ctx, b, q.From.ID, chat, target)
 		return
 	}
@@ -205,6 +217,6 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 		if e != nil || i < 0 || i >= len(r.Quotes) {
 			return
 		}
-		u.send(ctx, b, chat, "Сохранённый расчёт; для актуальной цены нажмите «Обновить».\n\n"+Breakdown(r.Quotes[i], u.Demo), nil)
+		u.send(ctx, b, chat, "Сохранённый расчёт; для актуальной цены нажмите «Обновить».\n\n"+equivalentText(r.Equivalent)+Breakdown(r.Quotes[i], u.Demo), nil)
 	}
 }

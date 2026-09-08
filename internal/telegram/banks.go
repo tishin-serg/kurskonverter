@@ -94,6 +94,7 @@ func (u *UI) bankMenu(ctx context.Context, b *bot.Bot, user, chat int64, provide
 	}
 	k := &models.InlineKeyboardMarkup{}
 	if provider == "" {
+		k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "Курс BTC/RUB", CallbackData: "rate"}})
 		for _, key := range []string{"bybit", "wallet"} {
 			k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: key + ": " + label(key), CallbackData: "banks:" + key + ":0"}})
 		}

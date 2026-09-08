@@ -17,6 +17,7 @@ type Calculator interface {
 }
 type Engine struct{ Routes []Calculator }
 type Result struct {
+	Equivalent  *domain.FiatEquivalent `json:",omitempty"`
 	Quotes      []domain.Quote
 	Unavailable map[string]string
 }
