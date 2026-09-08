@@ -79,7 +79,7 @@ func (c *Client) GetOffers(ctx context.Context, req provider.P2PRequest) ([]doma
 			if r.CryptoCurrency != apiAsset || r.FiatCurrency != req.Fiat || r.Side != "SELL" {
 				continue
 			}
-			o := domain.P2POffer{Provider: "Wallet", Asset: req.Asset, Fiat: req.Fiat, MerchantName: r.Nickname, PaymentMethods: r.Payments, OrdersCount: r.OrderNum, AssetStep: decimal.New(1, -9)}
+			o := domain.P2POffer{OfferID: r.ID, Provider: "Wallet", Asset: req.Asset, Fiat: req.Fiat, MerchantName: r.Nickname, PaymentMethods: r.Payments, OrdersCount: r.OrderNum, AssetStep: decimal.New(1, -9)}
 			valid := true
 			for _, x := range []struct {
 				s string

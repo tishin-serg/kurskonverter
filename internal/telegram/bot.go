@@ -28,17 +28,44 @@ type UI struct {
 }
 
 func (u *UI) New(token string) (*bot.Bot, error) {
-	return bot.New(token, bot.WithCheckInitTimeout(15*time.Second), bot.WithDefaultHandler(u.Handle), bot.WithWorkers(2), bot.WithNotAsyncHandlers(), bot.WithUpdatesChannelCap(64), bot.WithErrorsHandler(func(_ error) { u.Log.Warn("telegram API request failed") }))
+	return bot.New(token, bot.WithAllowedUpdates(bot.AllowedUpdates{"message", "callback_query"}), bot.WithCheckInitTimeout(15*time.Second), bot.WithDefaultHandler(u.Handle), bot.WithWorkers(2), bot.WithNotAsyncHandlers(), bot.WithUpdatesChannelCap(64), bot.WithErrorsHandler(func(_ error) { u.Log.Warn("telegram API request failed") }))
 }
 func (u *UI) send(ctx context.Context, b *bot.Bot, chat int64, text string, k *models.InlineKeyboardMarkup) {
+	chunks := splitMessage(text)
+	for i, chunk := range chunks {
+		params := &bot.SendMessageParams{ChatID: chat, Text: chunk}
+		// A typed nil in the ReplyMarkup interface becomes reply_markup=null;
+		// Telegram rejects it instead of treating the keyboard as omitted.
+		if i == len(chunks)-1 && k != nil {
+			params.ReplyMarkup = k
+		}
+		_, err := b.SendMessage(ctx, params)
+		if err != nil {
+			u.Log.Warn("telegram send failed", "part", i+1)
+			return
+		}
+	}
+}
+
+// 1900 runes fit Telegram's limit even when every rune uses two UTF-16 units.
+func splitMessage(text string) []string {
+	var chunks []string
 	runes := []rune(text)
-	if len(runes) > 3900 {
-		text = string(runes[:3900]) + "…"
+	for len(runes) > 1900 {
+		cut := 1900
+		for i := cut - 1; i >= 950; i-- {
+			if runes[i] == '\n' {
+				cut = i + 1
+				break
+			}
+		}
+		chunks = append(chunks, string(runes[:cut]))
+		runes = runes[cut:]
 	}
-	_, err := b.SendMessage(ctx, &bot.SendMessageParams{ChatID: chat, Text: text, ReplyMarkup: k})
-	if err != nil {
-		u.Log.Warn("telegram send failed")
+	if len(runes) > 0 {
+		chunks = append(chunks, string(runes))
 	}
+	return chunks
 }
 func (u *UI) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	u.Requests.Add(1)
@@ -139,10 +166,16 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 	if err != nil {
 		u.Log.Debug("callback acknowledgment failed")
 	}
-	if q.Message.Message == nil || q.Message.Message.Chat.Type != "private" {
+	var source *models.Chat
+	if q.Message.Message != nil {
+		source = &q.Message.Message.Chat
+	} else if q.Message.InaccessibleMessage != nil {
+		source = &q.Message.InaccessibleMessage.Chat
+	}
+	if source == nil || source.Type != "private" {
 		return
 	}
-	chat := q.Message.Message.Chat.ID
+	chat := source.ID
 	if q.From.ID != chat {
 		return
 	}

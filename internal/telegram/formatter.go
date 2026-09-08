@@ -3,6 +3,7 @@ package telegram
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/shopspring/decimal"
@@ -54,7 +55,14 @@ func Summary(target decimal.Decimal, r route.Result, demo bool) string {
 		b.WriteString("Нет маршрутов с подходящими актуальными данными.\n")
 	}
 	if len(r.Unavailable) > 0 {
-		fmt.Fprintf(&b, "Недоступно маршрутов: %d\n", len(r.Unavailable))
+		names := make([]string, 0, len(r.Unavailable))
+		for name := range r.Unavailable {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Fprintf(&b, "⚠️ %s: %s\n", name, unavailableReason(r.Unavailable[name]))
+		}
 	}
 	if len(r.Quotes) > 0 {
 		fmt.Fprintf(&b, "Расчёт: %s UTC\nОценка по стакану; цена может измениться до сделки.", r.Quotes[0].CalculatedAt.UTC().Format("15:04:05"))
@@ -67,13 +75,42 @@ func Breakdown(q domain.Quote, demo bool) string {
 		b.WriteString("🧪 ДЕМО — вымышленные данные\n")
 	}
 	fmt.Fprintf(&b, "%s\nПолучить: %s BTC\n\n", q.RouteID, q.TargetBTC.StringFixed(8))
-	for _, s := range q.Steps {
-		fmt.Fprintf(&b, "%s · %s\n%s %s → %s %s\n", s.Provider, s.Type, s.Input.String(), s.FromAsset, s.Output.String(), s.ToAsset)
+	for i, s := range q.Steps {
+		kind := map[string]string{"p2p": "Покупка P2P", "spot": "Обмен на бирже", "withdrawal": "Вывод", "deposit": "Зачисление", "exchange": "Обменник"}[s.Type]
+		if kind == "" {
+			kind = s.Type
+		}
+		fmt.Fprintf(&b, "%d. %s · %s\nОтдаю: %s %s\nПолучаю: %s %s\n", i+1, s.Provider, kind, s.Input.String(), s.FromAsset, s.Output.String(), s.ToAsset)
+		if s.Price.IsPositive() {
+			fmt.Fprintf(&b, "Курс: 1 %s = %s %s\n", s.ToAsset, s.Price.String(), s.FromAsset)
+		}
+		if s.Type == "p2p" {
+			merchant := s.MerchantName
+			if merchant == "" {
+				merchant = s.Description
+			}
+			if merchant != "" {
+				fmt.Fprintf(&b, "Продавец: %s\n", merchant)
+			}
+			if s.OfferID != "" {
+				fmt.Fprintf(&b, "Заявка: %s\n", s.OfferID)
+			}
+			if len(s.PaymentMethods) > 0 {
+				labels := make([]string, 0, len(s.PaymentMethods))
+				for _, method := range s.PaymentMethods {
+					labels = append(labels, bankLabel(strings.ToLower(s.Provider), method))
+				}
+				fmt.Fprintf(&b, "Оплата в заявке: %s\n", strings.Join(labels, ", "))
+			}
+			if s.MaxFiat.IsPositive() {
+				fmt.Fprintf(&b, "Лимиты заявки: %s–%s ₽\n", s.MinFiat.String(), s.MaxFiat.String())
+			}
+		}
 		if !s.Fee.IsZero() {
 			asset := s.ToAsset
 			fmt.Fprintf(&b, "Комиссия: %s %s\n", s.Fee.String(), asset)
 		}
-		if s.Description != "" {
+		if s.Description != "" && s.Type != "p2p" {
 			fmt.Fprintln(&b, s.Description)
 		}
 		b.WriteString("\n")
@@ -83,4 +120,21 @@ func Breakdown(q domain.Quote, demo bool) string {
 		fmt.Fprintf(&b, "\n⚠️ %s", w)
 	}
 	return b.String()
+}
+
+func unavailableReason(reason string) string {
+	switch {
+	case strings.HasPrefix(reason, "P2P payment unavailable: "):
+		return "в заявках нет выбранного способа оплаты «" + strings.TrimPrefix(reason, "P2P payment unavailable: ") + "». Выберите доступный банк через /banks."
+	case strings.Contains(reason, "insufficient liquidity"):
+		return "нет заявки под эту сумму и выбранные фильтры (банк, лимиты, резерв, надёжность). Попробуйте другую сумму или /banks."
+	case strings.Contains(reason, "below withdrawal minimum"):
+		return "сумма ниже минимального вывода биржи."
+	case strings.Contains(reason, "below market minimum"):
+		return "сумма ниже минимальной сделки на бирже."
+	case strings.Contains(reason, "stale"), strings.Contains(reason, "unavailable"):
+		return "нет свежих данных или операция временно недоступна. Нажмите «Обновить»."
+	default:
+		return reason
+	}
 }

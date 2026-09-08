@@ -105,6 +105,11 @@ func (p Path) Calculate(ctx context.Context, target decimal.Decimal, s *domain.M
 	if !fresh(data.UpdatedAt, now, 60*time.Second) {
 		return q, fmt.Errorf("P2P unavailable or stale")
 	}
+	if f.PaymentMethod != "" && !slices.ContainsFunc(data.Value, func(o domain.P2POffer) bool {
+		return domain.PaymentMatches(f.PaymentMethod, o.PaymentMethods)
+	}) {
+		return q, fmt.Errorf("P2P payment unavailable: %s", f.PaymentMethod)
+	}
 	offer, rub, err := money.SelectP2P(needed, p.Asset, data.Value, f)
 	if err != nil {
 		return q, fmt.Errorf("P2P: %w", err)
@@ -113,6 +118,10 @@ func (p Path) Calculate(ctx context.Context, target decimal.Decimal, s *domain.M
 		needed = money.Ceil(needed, offer.AssetStep)
 	}
 	steps[0] = domain.QuoteStep{Type: "p2p", FromAsset: "RUB", ToAsset: p.Asset, Input: rub, Output: needed, Price: offer.Price, Provider: offer.Provider, Description: offer.MerchantName}
+	steps[0].MerchantName = offer.MerchantName
+	steps[0].OfferID = offer.OfferID
+	steps[0].PaymentMethods = slices.Clone(offer.PaymentMethods)
+	steps[0].MinFiat, steps[0].MaxFiat = offer.MinFiat, offer.MaxFiat
 	q.Steps = steps
 	if offer.FeeFallback {
 		q.IsDegraded = true

@@ -13,6 +13,7 @@ type OrderBook struct {
 	UpdatedAt  time.Time
 }
 type P2POffer struct {
+	OfferID                                                 string
 	Provider, Asset, Fiat, MerchantName                     string
 	Price, MinFiat, MaxFiat, AvailableAsset, CompletionRate D
 	OrdersCount                                             int
@@ -46,6 +47,9 @@ type ExchangeOffer struct {
 	Enabled                            bool
 }
 type QuoteStep struct {
+	MerchantName, OfferID                           string
+	PaymentMethods                                  []string
+	MinFiat, MaxFiat                                D
 	Type, FromAsset, ToAsset, Provider, Description string
 	Input, Output, Price, Fee                       D
 }
