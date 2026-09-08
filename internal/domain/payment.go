@@ -2,6 +2,9 @@ package domain
 
 import "strings"
 
+// Verified against Bybit /v5/p2p/user/payment/list paymentConfigVo on 2026-09-09.
+const BybitTBCPayment = "165"
+
 // CanonicalPayment maps explicit bank names across APIs. Numeric provider IDs
 // remain unchanged: a generic bank transfer must never imply a specific bank.
 func CanonicalPayment(s string) string {

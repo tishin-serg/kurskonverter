@@ -31,6 +31,21 @@ var (
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "check-usd":
+			c, err := config.Load()
+			if len(os.Args) > 2 && os.Args[2] == "any" {
+				c.Filter.PaymentMethod = ""
+			}
+			if err == nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+				defer cancel()
+				err = app.CheckUSD(ctx, c, os.Stdout)
+			}
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			return
 		case "check-routes":
 			c, err := config.Load()
 			if len(os.Args) > 2 && os.Args[2] == "any" {

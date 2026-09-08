@@ -49,8 +49,12 @@ func (o Official) GetOffers(ctx context.Context, req provider.P2PRequest) ([]dom
 	if o.Client == nil {
 		return nil, ErrCredentials
 	}
-	if req.Asset != "USDT" || req.Fiat != "RUB" {
-		return nil, fmt.Errorf("bybit P2P adapter supports RUB/USDT only")
+	if req.Asset != "USDT" || (req.Fiat != "RUB" && req.Fiat != "USD") {
+		return nil, fmt.Errorf("bybit P2P adapter supports RUB and USD with USDT only")
+	}
+	side := "1"
+	if req.SellAsset {
+		side = "0"
 	}
 	var offers []domain.P2POffer
 	seen := map[string]bool{}
@@ -58,7 +62,7 @@ func (o Official) GetOffers(ctx context.Context, req provider.P2PRequest) ([]dom
 	rejected := map[string]int{}
 	for page := 1; page <= 10; page++ {
 		// side is the maker's side: buy USDT from sell advertisements.
-		body := map[string]string{"tokenId": req.Asset, "currencyId": req.Fiat, "side": "1", "page": strconv.Itoa(page), "size": "300"}
+		body := map[string]string{"tokenId": req.Asset, "currencyId": req.Fiat, "side": side, "page": strconv.Itoa(page), "size": "300"}
 		var result struct {
 			Count *int
 			Items []ad
@@ -118,7 +122,11 @@ func (o Official) GetOffers(ctx context.Context, req provider.P2PRequest) ([]dom
 }
 func normalizeAd(a ad, req provider.P2PRequest) (domain.P2POffer, error) {
 	var o domain.P2POffer
-	if a.TokenID != req.Asset || a.CurrencyID != req.Fiat || a.Side != "1" {
+	side := scalar("1")
+	if req.SellAsset {
+		side = "0"
+	}
+	if a.TokenID != req.Asset || a.CurrencyID != req.Fiat || a.Side != side {
 		return o, fmt.Errorf("wrong ad direction")
 	}
 	// Non-zero or missing P2P fees are not silently assumed free. This adapter
@@ -162,6 +170,7 @@ func normalizeAd(a ad, req provider.P2PRequest) (domain.P2POffer, error) {
 		return o, fmt.Errorf("invalid P2P order count")
 	}
 	o.Provider = "Bybit"
+	o.TakerSells = req.SellAsset
 	o.OfferID = a.ID
 	o.Asset = req.Asset
 	o.Fiat = req.Fiat

@@ -16,6 +16,7 @@ type OrderBook struct {
 	UpdatedAt  time.Time
 }
 type P2POffer struct {
+	TakerSells                                              bool
 	OfferID                                                 string
 	Provider, Asset, Fiat, MerchantName                     string
 	Price, MinFiat, MaxFiat, AvailableAsset, CompletionRate D
@@ -25,6 +26,7 @@ type P2POffer struct {
 	PaymentMethods                                          []string
 }
 type Filter struct {
+	DisallowFallback  bool
 	PaymentByProvider map[string]string
 	PaymentMethod     string
 	MinCompletionRate D

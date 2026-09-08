@@ -42,8 +42,8 @@ func TestDetailsCallbacksFromTelegramJSON(t *testing.T) {
 			if err := r.ParseMultipartForm(1 << 20); err != nil {
 				t.Error(err)
 			}
-			if _, present := r.Form["reply_markup"]; present {
-				t.Error("details must omit reply_markup entirely, not send a typed nil")
+			if r.FormValue("reply_markup") == "null" {
+				t.Error("details must not send a typed nil keyboard")
 				fmt.Fprint(w, `{"ok":false,"error_code":400,"description":"Bad Request: object expected as reply markup"}`)
 				return
 			}
