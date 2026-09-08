@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,13 +19,14 @@ import (
 )
 
 type UI struct {
-	Market   *market.Store
-	Storage  *storage.Store
-	Engine   route.Engine
-	Filter   domain.Filter
-	Demo     bool
-	Log      *slog.Logger
-	Requests atomic.Uint64
+	userLocks [64]sync.Mutex
+	Market    *market.Store
+	Storage   *storage.Store
+	Engine    route.Engine
+	Filter    domain.Filter
+	Demo      bool
+	Log       *slog.Logger
+	Requests  atomic.Uint64
 }
 
 func (u *UI) New(token string) (*bot.Bot, error) {
@@ -68,6 +70,15 @@ func splitMessage(text string) []string {
 	return chunks
 }
 func (u *UI) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
+	var actor int64
+	if update.CallbackQuery != nil {
+		actor = update.CallbackQuery.From.ID
+	} else if update.Message != nil && update.Message.From != nil {
+		actor = update.Message.From.ID
+	}
+	lock := &u.userLocks[uint64(actor)%64]
+	lock.Lock()
+	defer lock.Unlock()
 	u.Requests.Add(1)
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -90,12 +101,16 @@ func (u *UI) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 		u.rateCommand(ctx, b, user, chat, text)
 		return
 	}
-	if text == "/banks" || text == "/settings" {
+	if text == "/settings" {
+		u.settings(ctx, b, user, chat, "")
+		return
+	}
+	if text == "/banks" {
 		u.bankMenu(ctx, b, user, chat, "", 0)
 		return
 	}
-	if text == "/start" || text == "/help" {
-		u.send(ctx, b, chat, "Отправьте количество BTC для получения на внешний адрес: 0.01 BTC.\nИли задайте /rate 7000000 и отправьте 5000 руб — рассчитаю BTC-эквивалент и стоимость покупки.\n/settings — банк и личный курс BTC/RUB.\nРасчёт учитывает стакан и комиссии; выполнение сделок ботом не производится.", nil)
+	if text == "/start" || text == "/help" || text == "/cancel" || text == "/menu" {
+		u.home(ctx, b, user, chat, "")
 		return
 	}
 	if strings.HasPrefix(text, "/settings") {
@@ -126,15 +141,30 @@ func (u *UI) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 		u.send(ctx, b, chat, "Общий способ оплаты: "+p+"\nВыбрать отдельно для Bybit и Wallet: /banks\nСнять все фильтры оплаты: /settings any", nil)
 		return
 	}
+	if strings.HasPrefix(text, "/") {
+		u.home(ctx, b, user, chat, "Команда не найдена. Выберите действие:")
+		return
+	}
+	if u.pendingInput(ctx, b, user, chat, text) {
+		return
+	}
+	if strings.HasSuffix(strings.ToUpper(text), "USD") {
+		u.usdQuote(ctx, b, user, chat, text)
+		return
+	}
 	u.quote(ctx, b, user, chat, text)
 }
 func (u *UI) quote(ctx context.Context, b *bot.Bot, user, chat int64, text string) {
 	target, equivalent, e := u.requestAmount(ctx, user, text)
 	if e != nil {
-		u.send(ctx, b, chat, e.Error(), nil)
+		u.amountPanel(ctx, b, user, chat, "btc", e.Error())
 		return
 	}
-	f := u.Filter
+	f, e := u.personalFilter(ctx, user)
+	if e != nil {
+		u.settings(ctx, b, user, chat, "Настройки временно недоступны.")
+		return
+	}
 	p, e := u.Storage.Payment(ctx, user)
 	if e != nil {
 		u.send(ctx, b, chat, "Не удалось прочитать настройки.", nil)
@@ -160,10 +190,11 @@ func (u *UI) quote(ctx context.Context, b *bot.Bot, user, chat int64, text strin
 	}
 	k := &models.InlineKeyboardMarkup{}
 	for i, q := range r.Quotes {
-		k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "Подробнее: " + q.RouteID, CallbackData: fmt.Sprintf("d:%d:%d", id, i)}})
+		k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "Этапы · " + routeLabel(q.RouteID), CallbackData: fmt.Sprintf("d:%d:%d", id, i)}})
 	}
 	k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "Обновить", CallbackData: fmt.Sprintf("r:%d", id)}})
-	k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "Выбрать банк P2P", CallbackData: "banks"}})
+	k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "⚙️ Настройки", CallbackData: "settings"}, {Text: "🏠 Меню", CallbackData: "home"}})
+	u.finishInput(ctx, b, user, chat)
 	u.send(ctx, b, chat, Summary(target, r, u.Demo), k)
 }
 func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) {
@@ -184,8 +215,23 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 	if q.From.ID != chat {
 		return
 	}
+	if e := u.Storage.EnsureUser(ctx, q.From.ID); e != nil {
+		return
+	}
+	if strings.HasPrefix(q.Data, "u:") {
+		u.uiCallback(ctx, b, q.From.ID, chat, q.Data)
+		return
+	}
+	if q.Data == "home" {
+		u.home(ctx, b, q.From.ID, chat, "")
+		return
+	}
+	if q.Data == "settings" {
+		u.settings(ctx, b, q.From.ID, chat, "")
+		return
+	}
 	if q.Data == "rate" {
-		u.rateCommand(ctx, b, q.From.ID, chat, "/rate")
+		u.inputPanel(ctx, b, q.From.ID, chat, "rate", "")
 		return
 	}
 	if q.Data == "banks" || strings.HasPrefix(q.Data, "banks:") || strings.HasPrefix(q.Data, "bankset:") {
@@ -194,15 +240,17 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 	}
 	parts := strings.Split(q.Data, ":")
 	if len(parts) < 2 || len(parts) > 3 {
+		u.home(ctx, b, q.From.ID, chat, "Эта кнопка больше недоступна.")
 		return
 	}
 	id, e := strconv.ParseInt(parts[1], 10, 64)
 	if e != nil {
+		u.home(ctx, b, q.From.ID, chat, "Не удалось прочитать кнопку. Начните новый расчёт.")
 		return
 	}
 	target, r, e := u.Storage.Load(ctx, q.From.ID, id)
 	if e != nil {
-		u.send(ctx, b, chat, "Расчёт недоступен. Отправьте количество BTC заново.", nil)
+		u.home(ctx, b, q.From.ID, chat, "Расчёт больше не хранится. Начните новый.")
 		return
 	}
 	if parts[0] == "r" && len(parts) == 2 {
@@ -212,11 +260,24 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 		u.quote(ctx, b, q.From.ID, chat, target)
 		return
 	}
+	if (parts[0] == "ur" || parts[0] == "ud") && len(parts) == 2 {
+		if r.USD == nil {
+			u.home(ctx, b, q.From.ID, chat, "Расчёт USD недоступен.")
+			return
+		}
+		if parts[0] == "ur" {
+			u.usdQuote(ctx, b, q.From.ID, chat, r.USD.TargetUSD.String())
+		} else {
+			u.send(ctx, b, chat, usdDetails(*r.USD, u.Demo), keyboard([]models.InlineKeyboardButton{button("Обновить", fmt.Sprintf("ur:%d", id)), button("🏠 Меню", "home")}))
+		}
+		return
+	}
 	if parts[0] == "d" && len(parts) == 3 {
 		i, e := strconv.Atoi(parts[2])
 		if e != nil || i < 0 || i >= len(r.Quotes) {
+			u.home(ctx, b, q.From.ID, chat, "Этот маршрут больше недоступен. Начните новый расчёт.")
 			return
 		}
-		u.send(ctx, b, chat, "Сохранённый расчёт; для актуальной цены нажмите «Обновить».\n\n"+equivalentText(r.Equivalent)+Breakdown(r.Quotes[i], u.Demo), nil)
+		u.send(ctx, b, chat, "Сохранённый расчёт\n\n"+equivalentText(r.Equivalent)+Breakdown(r.Quotes[i], u.Demo), keyboard([]models.InlineKeyboardButton{button("Обновить", fmt.Sprintf("r:%d", id)), button("🏠 Меню", "home")}))
 	}
 }

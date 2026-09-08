@@ -126,5 +126,15 @@ func Workers(c config.Config, s *market.Store) []market.Worker {
 			return nil
 		}})
 	}
+	out = append(out, market.Worker{Name: "bybit:usd:p2p", Interval: c.BybitRefresh, Fetch: func(ctx context.Context) error {
+		v, e := (bybit.Official{Client: bb, ZeroFeeFallback: c.BybitP2PZeroFeeFallback}).GetOffers(ctx, provider.P2PRequest{Asset: "USDT", Fiat: "USD", SellAsset: true})
+		if e != nil {
+			return e
+		}
+		s.Update(func(n *domain.MarketSnapshot) {
+			n.P2P["bybit:usd"] = domain.Data[[]domain.P2POffer]{Value: v, UpdatedAt: time.Now()}
+		})
+		return nil
+	}})
 	return out
 }

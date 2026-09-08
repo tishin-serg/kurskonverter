@@ -17,6 +17,7 @@ type Calculator interface {
 }
 type Engine struct{ Routes []Calculator }
 type Result struct {
+	USD         *USDQuote              `json:",omitempty"`
 	Equivalent  *domain.FiatEquivalent `json:",omitempty"`
 	Quotes      []domain.Quote
 	Unavailable map[string]string
@@ -36,6 +37,8 @@ func (e Engine) Calculate(ctx context.Context, target decimal.Decimal, s *domain
 		q, err := c.Calculate(ctx, target, s, f, now)
 		if err != nil {
 			r.Unavailable[c.ID()] = err.Error()
+		} else if f.DisallowFallback && q.IsDegraded {
+			r.Unavailable[c.ID()] = "fallback disabled"
 		} else {
 			r.Quotes = append(r.Quotes, q)
 		}

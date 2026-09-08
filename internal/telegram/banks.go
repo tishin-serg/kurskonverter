@@ -24,6 +24,12 @@ func bankLabel(provider, id string) string {
 		return "СБП"
 	}
 	if provider == "bybit" {
+		if id == domain.BybitTBCPayment {
+			return "TBC Bank"
+		}
+		if id == "416" {
+			return "Баланс Bybit (не банк)"
+		}
 		if id == "14" {
 			return "Банковский перевод (14)"
 		}
@@ -94,18 +100,18 @@ func (u *UI) bankMenu(ctx context.Context, b *bot.Bot, user, chat int64, provide
 	}
 	k := &models.InlineKeyboardMarkup{}
 	if provider == "" {
-		k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "Курс BTC/RUB", CallbackData: "rate"}})
 		for _, key := range []string{"bybit", "wallet"} {
 			k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: key + ": " + label(key), CallbackData: "banks:" + key + ":0"}})
 		}
-		u.send(ctx, b, chat, "Выберите источник P2P. Банк сохраняется отдельно для каждого источника и только для вас.\nBestChange использует отдельное направление обмена сервера; этот выбор его не меняет.", k)
+		k.InlineKeyboard = append(k.InlineKeyboard, one("← Назад", "settings"))
+		u.panel(ctx, b, user, chat, "banks", "Банки P2P\n\nВыберите площадку. Банк для BestChange задан отдельным направлением обмена.", k)
 		return
 	}
 	if provider != "bybit" && provider != "wallet" {
 		return
 	}
 	choices := u.bankChoices(provider)
-	const size = 12
+	const size = 6
 	pages := (len(choices) + size - 1) / size
 	if pages == 0 {
 		pages = 1
@@ -128,12 +134,12 @@ func (u *UI) bankMenu(ctx context.Context, b *bot.Bot, user, chat int64, provide
 	if len(nav) > 0 {
 		k.InlineKeyboard = append(k.InlineKeyboard, nav)
 	}
-	k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "Назад", CallbackData: "banks"}})
-	text := fmt.Sprintf("%s · выбран: %s\nСпособы из актуальных объявлений, страница %d/%d. Наличие способа ещё не гарантирует подходящие лимиты и рейтинг продавца.", provider, label(provider), page+1, pages)
+	k.InlineKeyboard = append(k.InlineKeyboard, []models.InlineKeyboardButton{{Text: "← Назад", CallbackData: "banks"}})
+	text := fmt.Sprintf("Банк · %s\nВыбран: %s\n\nДоступные способы оплаты · %d/%d", provider, label(provider), page+1, pages)
 	if len(choices) == 0 {
 		text += "\nСвежих объявлений пока нет. Попробуйте позже."
 	}
-	u.send(ctx, b, chat, text, k)
+	u.panel(ctx, b, user, chat, "banks:"+provider, text, k)
 }
 func (u *UI) bankCallback(ctx context.Context, b *bot.Bot, user, chat int64, data string) {
 	if e := u.Storage.EnsureUser(ctx, user); e != nil {
@@ -167,7 +173,6 @@ func (u *UI) bankCallback(ctx context.Context, b *bot.Bot, user, chat int64, dat
 		}
 	}
 	if !found {
-		u.send(ctx, b, chat, "Этот способ больше не найден в свежих объявлениях. Выберите из обновлённого списка.", nil)
 		u.bankMenu(ctx, b, user, chat, p[1], 0)
 		return
 	}
@@ -175,5 +180,5 @@ func (u *UI) bankCallback(ctx context.Context, b *bot.Bot, user, chat int64, dat
 		u.send(ctx, b, chat, "Не удалось сохранить банк.", nil)
 		return
 	}
-	u.bankMenu(ctx, b, user, chat, p[1], 0)
+	u.settings(ctx, b, user, chat, "✅ Банк сохранён")
 }

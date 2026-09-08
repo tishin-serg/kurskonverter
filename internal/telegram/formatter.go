@@ -13,6 +13,17 @@ import (
 
 var amountPattern = regexp.MustCompile(`(?i)^([0-9]{1,8})(?:[.,]([0-9]{1,8}))?(?:\s+BTC)?$`)
 
+func routeLabel(id string) string {
+	switch id {
+	case "Bybit P2P → USDT → BTC":
+		return "Bybit"
+	case "Wallet → GRAM → OKX":
+		return "Wallet → OKX"
+	default:
+		return id
+	}
+}
+
 func ParseAmount(text string) (decimal.Decimal, error) {
 	text = strings.TrimSpace(text)
 	if len(text) > 40 || !amountPattern.MatchString(text) {
@@ -38,7 +49,7 @@ func Summary(target decimal.Decimal, r route.Result, demo bool) string {
 		if i < len(medals) {
 			label = medals[i]
 		}
-		fmt.Fprintf(&b, "%s %s\n%s ₽\n", label, q.RouteID, q.RUBRequired.StringFixed(2))
+		fmt.Fprintf(&b, "%s %s — %s ₽\n", label, routeLabel(q.RouteID), q.RUBRequired.StringFixed(2))
 		if q.RouteID == "BestChange" && len(q.Steps) > 0 {
 			fmt.Fprintf(&b, "Обменник: %s\n", q.Steps[0].Provider)
 		}
@@ -128,6 +139,8 @@ func Breakdown(q domain.Quote, demo bool) string {
 
 func unavailableReason(reason string) string {
 	switch {
+	case reason == "fallback disabled":
+		return "исключён настройкой резервных комиссий."
 	case strings.HasPrefix(reason, "P2P payment unavailable: "):
 		return "в заявках нет выбранного способа оплаты «" + strings.TrimPrefix(reason, "P2P payment unavailable: ") + "». Выберите доступный банк через /banks."
 	case strings.Contains(reason, "insufficient liquidity"):

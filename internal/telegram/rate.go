@@ -39,31 +39,15 @@ func equivalentBTC(rub, rate decimal.Decimal) (decimal.Decimal, error) {
 
 func (u *UI) rateCommand(ctx context.Context, b *bot.Bot, user, chat int64, text string) {
 	parts := strings.Fields(text)
-	if len(parts) > 2 {
-		u.send(ctx, b, chat, "Формат: /rate 7000000 — рублей за 1 BTC.", nil)
-		return
-	}
 	if len(parts) == 2 {
-		rate, err := parseRate(parts[1])
-		if err != nil {
-			u.send(ctx, b, chat, err.Error(), nil)
-			return
-		}
-		if err = u.Storage.SetReferenceRate(ctx, user, rate.String()); err != nil {
-			u.send(ctx, b, chat, "Не удалось сохранить курс.", nil)
-			return
-		}
-	}
-	raw, err := u.Storage.ReferenceRate(ctx, user)
-	if err != nil {
-		u.send(ctx, b, chat, "Не удалось прочитать курс.", nil)
+		u.saveSetting(ctx, b, user, chat, "rate", parts[1])
 		return
 	}
-	current := "Личный курс BTC/RUB ещё не задан."
-	if raw != "" {
-		current = "Ваш курс: 1 BTC = " + raw + " ₽."
+	note := ""
+	if len(parts) > 2 {
+		note = "Введите один курс, например 7000000."
 	}
-	u.send(ctx, b, chat, current+"\nИзменить: /rate 7000000\nЗатем отправьте 5000 руб — рассчитаю BTC-эквивалент и фактическую стоимость маршрутов.\nЭтот курс используется только для определения суммы BTC, цены покупки берутся с рынков.", nil)
+	u.inputPanel(ctx, b, user, chat, "rate", note)
 }
 
 func (u *UI) requestAmount(ctx context.Context, user int64, text string) (decimal.Decimal, *domain.FiatEquivalent, error) {

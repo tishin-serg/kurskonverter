@@ -29,5 +29,6 @@ func Snapshot(now time.Time) *domain.MarketSnapshot {
 		s.P2P[x.key] = domain.Data[[]domain.P2POffer]{UpdatedAt: now, Value: []domain.P2POffer{{Provider: x.key, Asset: x.asset, Fiat: "RUB", MerchantName: "DEMO merchant", Price: d(x.price), MinFiat: d("1000"), MaxFiat: d("10000000"), AvailableAsset: d("100000"), CompletionRate: d("99"), OrdersCount: 1000, PaymentMethods: []string{"demo-bank"}}}}
 	}
 	s.Exchange = domain.Data[[]domain.ExchangeOffer]{UpdatedAt: now, Value: []domain.ExchangeOffer{{Exchanger: "DEMO exchanger", PaymentMethod: "demo-bank", Rate: d("8800000"), MinFiat: d("1000"), MaxFiat: d("10000000"), ReserveBTC: d("10"), Enabled: true}}}
+	s.P2P["bybit:usd"] = domain.Data[[]domain.P2POffer]{UpdatedAt: now, Value: []domain.P2POffer{{OfferID: "demo-usd", Provider: "Bybit", Asset: "USDT", Fiat: "USD", TakerSells: true, MerchantName: "DEMO USD buyer", Price: d("1.01"), MinFiat: d("10"), MaxFiat: d("10000"), AvailableAsset: d("100000"), CompletionRate: d("99"), OrdersCount: 1000, AssetStep: d("0.000001"), PaymentMethods: []string{domain.BybitTBCPayment}}}}
 	return s
 }

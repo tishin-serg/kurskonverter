@@ -9,7 +9,10 @@ import (
 
 var ErrNotConfigured = errors.New("TODO: verified API contract and credentials required")
 
-type P2PRequest struct{ Asset, Fiat, PaymentMethod string }
+type P2PRequest struct {
+	Asset, Fiat, PaymentMethod string
+	SellAsset                  bool
+}
 type OrderBookProvider interface {
 	GetOrderBook(context.Context, string) (domain.OrderBook, error)
 }
