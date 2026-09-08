@@ -20,20 +20,20 @@
 | Secret | Значение |
 |---|---|
 | `VDS_HOST` | DNS или IPv4 VPS |
-| `VDS_USER` | SSH-пользователь с доступом к Docker и /opt/kurskonverter |
+| `VDS_USER` | Только `kursdeploy`; root запрещён workflow |
 | `VDS_PORT` | SSH-порт, необязательно, по умолчанию 22 |
 | `VDS_SSH_PRIVATE_KEY` | Выделенный приватный ключ SSH |
 | `VDS_KNOWN_HOSTS` | Проверенная запись host key VPS |
 
 Имена первых четырёх совпадают с magnetto. Значения секретов не копировались из другого репозитория. Ключ хоста сверяется по доверенному каналу; не подставлять непроверенный результат ssh-keyscan.
 
-GHCR использует встроенный `GITHUB_TOKEN`. Постоянный registry token не требуется. Если package private, проверить доступ Actions этого репозитория к пакету.
+Публикация GHCR использует `GITHUB_TOKEN`. Сервер скачивает публичный пакет без токена. Для private package администратор отдельно настраивает read-only registry credential.
 
 ## Первый запуск на сервере
 
-Нужны Docker Engine, Compose v2, Bash и flock. Сборки выполняются на GitHub. Пользователь `VDS_USER` должен иметь возможность выполнять Docker-команды и записывать в каталог проекта; workflow не вызывает sudo и не использует `/usr/local/sbin/magnetto-deploy`.
+Нужны Docker Engine, Compose v2, Bash, sudo и flock. Администратор запускает `bash deploy/install-access.sh /path/to/dedicated-key.pub`. Скрипт создаёт `kursdeploy` без группы Docker, с заблокированным паролем и root-owned домашним каталогом и authorized_keys. Разрешена только команда `deploy ghcr.io/tishin-serg/kurskonverter@sha256:<64 hex>`. Forced command запрещает shell и SFTP; restrict запрещает PTY и forwarding. Sudo разрешает только root-owned helper, который повторно проверяет аргумент и очищает окружение.
 
-1. Создать `/opt/kurskonverter`, доступный пользователю деплоя.
+1. Создать `/opt/kurskonverter` с владельцем root:root и правами 700. Compose и скрипты также принадлежат root.
 2. Установить `deploy/compose.yaml` из этого репозитория как `/opt/kurskonverter/compose.yaml`.
 3. Подготовить `/opt/kurskonverter/.env` с реальными ключами приложения, права 600. Пример — `.env.example`. API-ключи бота/бирж не входят в образ и не публикуются в GitHub.
 4. При переносе сохранить SQLite из локального экземпляра. Контейнер использует volume `kurskonverter_bot-data` и файл `/data/bot.db`; владелец в контейнере UID/GID 10001. Миграции выполняются при запуске.
@@ -49,3 +49,9 @@ Compose project: `kurskonverter`. HTTP привязан к `127.0.0.1:18089`, в
 Точный digest доступен в artifact `deployment-image/image.txt` и summary CI/CD. Ручной откат: Actions → Deploy → Run workflow → digest предыдущего успешного образа и его версия.
 
 Дальнейшая работа: `ST/*` → PR → проверки → merge в `main` → автоматический деплой. После первого CI настроить required status checks для main; возможность защиты ветки зависит от плана и доступа к репозиторию.
+
+## Замена ключа
+
+Отдельный Ed25519 ключ: публичная часть устанавливается через install-access.sh, приватная — в `VDS_SSH_PRIVATE_KEY`, `VDS_USER=kursdeploy`. Остальные SSH-секреты не меняются. Старый административный ключ удалить из GitHub Secrets, но не из административного доступа к серверу.
+
+Helper и Compose обновляются администратором. Права публикации образов позволяют менять код приложения и читать доступные приложению секреты; ограниченный SSH не устраняет этот уровень доверия. На vdska_pl установлен лимит 192 MiB и GOMEMLIMIT=128MiB в серверном compose.override.yaml.

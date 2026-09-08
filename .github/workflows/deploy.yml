@@ -67,22 +67,17 @@ jobs:
           HOST: ${{ secrets.VDS_HOST }}
           USER: ${{ secrets.VDS_USER }}
           PORT: ${{ secrets.VDS_PORT }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_USER: ${{ github.actor }}
         run: |
           [[ "$IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
           expected="ghcr.io/${GITHUB_REPOSITORY,,}@sha256:"
           [[ "$IMAGE" == "$expected"* ]]
           [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
-          [[ "$USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
-          [[ "$GH_USER" =~ ^[a-zA-Z0-9_-]+$ ]]
+          [[ "$USER" == kursdeploy ]] || { echo "VDS_USER must be kursdeploy"; exit 1; }
           PORT=${PORT:-22}
           [[ "$PORT" =~ ^[0-9]+$ ]]
           ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "$PORT")
-          printf '%s' "$GH_TOKEN" | ssh "${ssh_args[@]}" "$USER@$HOST" "docker login ghcr.io -u '$GH_USER' --password-stdin" > /dev/null
-          trap 'ssh "${ssh_args[@]}" "$USER@$HOST" "docker logout ghcr.io" >/dev/null 2>&1 || true' EXIT
-          ssh "${ssh_args[@]}" "$USER@$HOST" "bash -s -- '$IMAGE'" < deploy/deploy.sh
-          commit=$(ssh "${ssh_args[@]}" "$USER@$HOST" "docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' '$IMAGE'")
+          ssh "${ssh_args[@]}" "$USER@$HOST" "deploy $IMAGE" < /dev/null | tee deployment.log
+          commit=$(sed -n 's/^commit=//p' deployment.log)
           [[ "$commit" =~ ^[a-f0-9]{40}$ ]]
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
       - name: Deployment summary

@@ -14,6 +14,7 @@ case "$*" in
   'pull '*) [[ "${SCENARIO}" != pullfail ]];;
   'compose up '*) printf '%s' "$BOT_IMAGE" > "$MOCK_STATE";;
   'compose ps -q bot') echo container;;
+  'image inspect '*) printf 'c%.0s' {1..40}; echo;;
   'inspect '*) echo healthy;;
   'compose exec -T bot bot healthcheck ready') [[ "$SCENARIO" != rollbackfail ]] && { [[ "$SCENARIO" != fail && "$SCENARIO" != firstfail ]] || [[ "$(cat "$MOCK_STATE")" == "$OLD" ]]; };;
   'compose stop bot') echo stopped > "$MOCK_STATE";;
@@ -41,3 +42,5 @@ for SCENARIO in success fail firstfail pullfail rollbackfail; do
   esac
   echo "deploy $SCENARIO: PASS"
 done
+
+bash "$root/scripts/deploy-access-test.sh"

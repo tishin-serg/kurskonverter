@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the VPS via stdin. Requires Docker Compose v2 and flock.
+# Installed by an administrator; never accept scripts over SSH stdin.
 set -Eeuo pipefail
 cd "${DEPLOY_DIR:-/opt/kurskonverter}"
 exec 9>.deploy.lock
@@ -51,4 +51,8 @@ printf '%s\n' "$image" > current-image.tmp
 mv current-image.tmp current-image
 trap - ERR
 echo 'Deployment healthy and ready'
+
+
+commit=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image")
+[[ "$commit" =~ ^[a-f0-9]{40}$ ]] && printf 'commit=%s\n' "$commit"
 
