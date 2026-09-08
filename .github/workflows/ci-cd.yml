@@ -23,7 +23,7 @@ jobs:
     outputs:
       image: ${{ steps.image.outputs.exact }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Registry name
