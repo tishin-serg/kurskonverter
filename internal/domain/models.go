@@ -7,6 +7,9 @@ import (
 )
 
 type D = decimal.Decimal
+
+// FiatEquivalent records the user's conversion basis, not a market quote.
+type FiatEquivalent struct{ RUB, Rate D }
 type OrderBookLevel struct{ Price, Amount D }
 type OrderBook struct {
 	Asks, Bids []OrderBookLevel

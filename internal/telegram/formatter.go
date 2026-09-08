@@ -31,6 +31,7 @@ func Summary(target decimal.Decimal, r route.Result, demo bool) string {
 		b.WriteString("🧪 ДЕМО — вымышленные данные\n\n")
 	}
 	fmt.Fprintf(&b, "💰 Получить %s BTC\n\n", target.StringFixed(8))
+	b.WriteString(equivalentText(r.Equivalent))
 	medals := []string{"🥇", "🥈", "🥉"}
 	for i, q := range r.Quotes {
 		label := "•"
@@ -38,6 +39,9 @@ func Summary(target decimal.Decimal, r route.Result, demo bool) string {
 			label = medals[i]
 		}
 		fmt.Fprintf(&b, "%s %s\n%s ₽\n", label, q.RouteID, q.RUBRequired.StringFixed(2))
+		if q.RouteID == "BestChange" && len(q.Steps) > 0 {
+			fmt.Fprintf(&b, "Обменник: %s\n", q.Steps[0].Provider)
+		}
 		if i > 0 {
 			fmt.Fprintf(&b, "+%s ₽ / +%s%%\n", q.DifferenceRub.StringFixed(2), q.DifferencePercent.StringFixed(2))
 		}

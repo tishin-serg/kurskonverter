@@ -18,6 +18,20 @@ var migrations embed.FS
 
 type Store struct{ DB *sql.DB }
 
+func (s *Store) ReferenceRate(ctx context.Context, user int64) (string, error) {
+	var rate string
+	err := s.DB.QueryRowContext(ctx, "SELECT btc_rub_rate FROM user_rates WHERE user_id=?", user).Scan(&rate)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return rate, err
+}
+
+func (s *Store) SetReferenceRate(ctx context.Context, user int64, rate string) error {
+	_, err := s.DB.ExecContext(ctx, "INSERT INTO user_rates(user_id,btc_rub_rate) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET btc_rub_rate=excluded.btc_rub_rate", user, rate)
+	return err
+}
+
 func Open(ctx context.Context, path string) (*Store, error) {
 	if path != ":memory:" {
 		if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
