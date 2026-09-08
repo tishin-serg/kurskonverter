@@ -5,7 +5,7 @@ go 1.27.1
 require (
 	github.com/go-telegram/bot v1.25.0
 	github.com/shopspring/decimal v1.4.0
-	golang.org/x/sync v0.22.0
+	golang.org/x/sync v0.23.0
 	modernc.org/sqlite v1.58.0
 )
 
@@ -20,4 +20,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
-
