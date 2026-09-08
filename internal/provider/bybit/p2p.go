@@ -69,12 +69,18 @@ func (o Official) GetOffers(ctx context.Context, req provider.P2PRequest) ([]dom
 		if result.Count == nil || *result.Count < 0 || *result.Count > 3000 {
 			return nil, fmt.Errorf("bybit P2P invalid or excessive page count")
 		}
+		uniqueBefore := len(seen)
 		for _, a := range result.Items {
-			if a.ID == "" || seen[a.ID] {
-				return nil, fmt.Errorf("bybit P2P inconsistent pagination")
+			if a.ID == "" {
+				return nil, fmt.Errorf("bybit P2P missing ad ID")
+			}
+			// Ads can move between pages while the live order list changes.
+			// Count rows for pagination, but never count an offer's liquidity twice.
+			read++
+			if seen[a.ID] {
+				continue
 			}
 			seen[a.ID] = true
-			read++
 			fallback := false
 			if o.ZeroFeeFallback {
 				// Missing fields only; an explicit non-zero fee is never overridden.
@@ -94,6 +100,9 @@ func (o Official) GetOffers(ctx context.Context, req provider.P2PRequest) ([]dom
 			}
 			v.FeeFallback = fallback
 			offers = append(offers, v)
+		}
+		if len(result.Items) > 0 && len(seen) == uniqueBefore {
+			return nil, fmt.Errorf("bybit P2P repeated page without progress")
 		}
 		if read >= *result.Count {
 			if read > 0 && len(offers) == 0 {
@@ -153,6 +162,7 @@ func normalizeAd(a ad, req provider.P2PRequest) (domain.P2POffer, error) {
 		return o, fmt.Errorf("invalid P2P order count")
 	}
 	o.Provider = "Bybit"
+	o.OfferID = a.ID
 	o.Asset = req.Asset
 	o.Fiat = req.Fiat
 	o.MerchantName = a.NickName
