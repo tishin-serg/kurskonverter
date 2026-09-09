@@ -129,12 +129,12 @@ func TestNavigationAndPersonalSettings(t *testing.T) {
 	if v.State != "home" {
 		t.Fatal(v)
 	}
-	if sends != 1 {
+	if sends != 2 {
 		t.Fatal("menus flooded the chat", sends)
 	}
 	failEdit = true
 	click("settings")
-	if sends != 2 {
+	if sends != 3 {
 		t.Fatal("failed edit did not recover", sends)
 	}
 	failEdit = false
@@ -156,5 +156,14 @@ func TestNavigationAndPersonalSettings(t *testing.T) {
 	}
 	if !strings.Contains(last, "TBC Bank") {
 		t.Fatal(last)
+	}
+	beforeSends, beforeEdits := sends, edits
+	callback("home")
+	if sends != beforeSends+1 || edits != beforeEdits || !strings.Contains(last, "Калькулятор") {
+		t.Fatal("result menu edited an invisible old panel", sends, edits, last)
+	}
+	click("settings")
+	if sends != beforeSends+1 || edits != beforeEdits+1 {
+		t.Fatal("navigation within the new panel must edit it")
 	}
 }
