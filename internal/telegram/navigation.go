@@ -23,6 +23,19 @@ func one(text, action string) []models.InlineKeyboardButton {
 	return []models.InlineKeyboardButton{button(text, action)}
 }
 
+// Entry points outside the active panel must open a visible menu at the end
+// of the chat. Editing an earlier panel does not scroll Telegram to it.
+func (u *UI) newPanel(ctx context.Context, user int64) {
+	v, err := u.Storage.UIState(ctx, user)
+	if err != nil {
+		return
+	}
+	v.PanelID = 0
+	if err := u.Storage.SaveUI(ctx, user, v); err != nil {
+		u.Log.Warn("menu state reset failed")
+	}
+}
+
 // Only menu panels are edited; saved calculation messages never use this path.
 func (u *UI) panel(ctx context.Context, b *bot.Bot, user, chat int64, state, text string, k *models.InlineKeyboardMarkup) {
 	v, err := u.Storage.UIState(ctx, user)

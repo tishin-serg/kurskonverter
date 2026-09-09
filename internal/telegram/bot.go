@@ -97,6 +97,9 @@ func (u *UI) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 		return
 	}
 	text := strings.TrimSpace(m.Text)
+	if strings.HasPrefix(text, "/") && text != "/cancel" {
+		u.newPanel(ctx, user)
+	}
 	if text == "/rate" || strings.HasPrefix(text, "/rate ") {
 		u.rateCommand(ctx, b, user, chat, text)
 		return
@@ -222,6 +225,9 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 		u.uiCallback(ctx, b, q.From.ID, chat, q.Data)
 		return
 	}
+	// Legacy and result buttons are outside the active navigation panel.
+	// Preserve the calculation and open navigation beside it.
+	u.newPanel(ctx, q.From.ID)
 	if q.Data == "home" {
 		u.home(ctx, b, q.From.ID, chat, "")
 		return
