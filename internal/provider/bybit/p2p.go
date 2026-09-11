@@ -127,11 +127,11 @@ func normalizeAd(a ad, req provider.P2PRequest) (domain.P2POffer, error) {
 	if a.Blocked != "N" {
 		return o, fmt.Errorf("P2P ad blocked or availability unknown")
 	}
-	countries, err := adCountries(a.TradingPreferenceSet)
+	countries, err := blockedCountries(a.TradingPreferenceSet)
 	if err != nil {
 		return o, err
 	}
-	o.AllowedCountries = countries
+	o.BlockedCountries = countries
 	side := scalar("1")
 	if req.SellAsset {
 		side = "0"

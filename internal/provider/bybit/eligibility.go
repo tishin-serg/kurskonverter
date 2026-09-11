@@ -8,7 +8,7 @@ import (
 
 // The online API returns maker preferences even when the caller cannot trade.
 // Decode per ad so malformed eligibility data cannot remove valid neighbouring ads.
-func adCountries(raw json.RawMessage) ([]string, error) {
+func blockedCountries(raw json.RawMessage) ([]string, error) {
 	var p struct {
 		HasNationalLimit scalar
 		NationalLimit    string

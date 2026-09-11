@@ -14,7 +14,7 @@ import (
 	"github.com/tishin-serg/kurskonverter/internal/provider/httpclient"
 )
 
-func TestAdCountries(t *testing.T) {
+func TestBlockedCountries(t *testing.T) {
 	for _, tc := range []struct {
 		name, raw string
 		want      []string
@@ -35,7 +35,7 @@ func TestAdCountries(t *testing.T) {
 		{"trailing comma", `{"hasNationalLimit":1,"nationalLimit":"RUS,"}`, nil, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := adCountries(json.RawMessage(tc.raw))
+			got, err := blockedCountries(json.RawMessage(tc.raw))
 			if (err != nil) != tc.bad || !reflect.DeepEqual(got, tc.want) {
 				t.Fatal(got, err)
 			}
@@ -57,7 +57,7 @@ func TestP2PAvailabilityFiltering(t *testing.T) {
 	c := NewAuthenticated(httpclient.New(), "key", "secret")
 	c.BaseURL = srv.URL
 	ads, err := (Official{Client: c}).GetOffers(context.Background(), provider.P2PRequest{Asset: "USDT", Fiat: "RUB"})
-	if err != nil || len(ads) != 1 || !reflect.DeepEqual(ads[0].AllowedCountries, []string{"RUS", "GEO"}) {
+	if err != nil || len(ads) != 1 || !reflect.DeepEqual(ads[0].BlockedCountries, []string{"RUS", "GEO"}) {
 		t.Fatal(ads, err)
 	}
 }
