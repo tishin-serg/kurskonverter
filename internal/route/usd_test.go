@@ -41,7 +41,7 @@ func TestUSDTBCJointQuote(t *testing.T) {
 	}
 }
 func TestUSDTBCExclusions(t *testing.T) {
-	for _, kind := range []string{"wrong-bank", "wrong-direction", "stale", "min-usd", "max-usd", "reserve", "success", "orders", "rub-bank", "rub-reserve", "fallback"} {
+	for _, kind := range []string{"wrong-bank", "wrong-direction", "stale", "min-usd", "max-usd", "reserve", "success", "orders", "rub-bank", "rub-reserve", "fallback", "rub-country", "usd-country", "unknown-country"} {
 		t.Run(kind, func(t *testing.T) {
 			now := time.Now()
 			s := demo.Snapshot(now)
@@ -50,6 +50,14 @@ func TestUSDTBCExclusions(t *testing.T) {
 			usd := s.P2P["bybit:usd"]
 			rub := s.P2P["bybit"]
 			switch kind {
+			case "rub-country":
+				f.BybitCountry = "RUS"
+				rub.Value[0].AllowedCountries = []string{"GEO"}
+			case "usd-country":
+				f.BybitCountry = "RUS"
+				usd.Value[0].AllowedCountries = []string{"GEO"}
+			case "unknown-country":
+				usd.Value[0].AllowedCountries = []string{"RUS"}
 			case "wrong-bank":
 				usd.Value[0].PaymentMethods = []string{"14"}
 			case "wrong-direction":

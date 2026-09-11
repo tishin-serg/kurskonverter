@@ -89,6 +89,9 @@ func SelectP2P(amount decimal.Decimal, asset string, offers []domain.P2POffer, f
 		return best, cost, ErrInvalid
 	}
 	for _, o := range offers {
+		if !domain.CountryEligible(o, f) {
+			continue
+		}
 		needed := amount
 		if o.AssetStep.IsPositive() {
 			needed = Ceil(amount, o.AssetStep)

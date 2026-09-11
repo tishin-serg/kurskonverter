@@ -32,6 +32,8 @@ func (s *scalar) UnmarshalJSON(b []byte) error {
 }
 
 type ad struct {
+	Blocked                                                                            string
+	TradingPreferenceSet                                                               json.RawMessage
 	ID, TokenID, CurrencyID, NickName                                                  string
 	Side, Price, LastQuantity, MinAmount, MaxAmount, RecentOrderNum, RecentExecuteRate scalar
 	Payments                                                                           []string
@@ -122,6 +124,14 @@ func (o Official) GetOffers(ctx context.Context, req provider.P2PRequest) ([]dom
 }
 func normalizeAd(a ad, req provider.P2PRequest) (domain.P2POffer, error) {
 	var o domain.P2POffer
+	if a.Blocked != "N" {
+		return o, fmt.Errorf("P2P ad blocked or availability unknown")
+	}
+	countries, err := adCountries(a.TradingPreferenceSet)
+	if err != nil {
+		return o, err
+	}
+	o.AllowedCountries = countries
 	side := scalar("1")
 	if req.SellAsset {
 		side = "0"

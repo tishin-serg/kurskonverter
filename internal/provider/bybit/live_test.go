@@ -22,7 +22,7 @@ import (
 	"github.com/tishin-serg/kurskonverter/internal/route"
 )
 
-const adJSON = `{"id":"a","tokenId":"USDT","currencyId":"RUB","side":1,"price":"90","lastQuantity":"10000","minAmount":"100","maxAmount":"1000000","nickName":"test seller","recentOrderNum":100,"recentExecuteRate":"99","payments":["bank"],"symbolInfo":{"buyFeeRate":"0","sellFeeRate":"0","token":{"scale":6}}}`
+const adJSON = `{"id":"a","blocked":"N","tradingPreferenceSet":{"hasNationalLimit":0,"nationalLimit":""},"tokenId":"USDT","currencyId":"RUB","side":1,"price":"90","lastQuantity":"10000","minAmount":"100","maxAmount":"1000000","nickName":"test seller","recentOrderNum":100,"recentExecuteRate":"99","payments":["bank"],"symbolInfo":{"buyFeeRate":"0","sellFeeRate":"0","token":{"scale":6}}}`
 
 func TestBybitFullRoute(t *testing.T) {
 	ctx := context.Background()
