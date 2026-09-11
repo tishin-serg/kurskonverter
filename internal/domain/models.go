@@ -16,7 +16,7 @@ type OrderBook struct {
 	UpdatedAt  time.Time
 }
 type P2POffer struct {
-	AllowedCountries                                        []string
+	BlockedCountries                                        []string
 	TakerSells                                              bool
 	OfferID                                                 string
 	Provider, Asset, Fiat, MerchantName                     string

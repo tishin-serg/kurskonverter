@@ -52,12 +52,12 @@ func TestUSDTBCExclusions(t *testing.T) {
 			switch kind {
 			case "rub-country":
 				f.BybitCountry = "RUS"
-				rub.Value[0].AllowedCountries = []string{"GEO"}
+				rub.Value[0].BlockedCountries = []string{"RUS"}
 			case "usd-country":
 				f.BybitCountry = "RUS"
-				usd.Value[0].AllowedCountries = []string{"GEO"}
+				usd.Value[0].BlockedCountries = []string{"RUS"}
 			case "unknown-country":
-				usd.Value[0].AllowedCountries = []string{"RUS"}
+				usd.Value[0].BlockedCountries = []string{"RUS"}
 			case "wrong-bank":
 				usd.Value[0].PaymentMethods = []string{"14"}
 			case "wrong-direction":
