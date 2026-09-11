@@ -144,7 +144,7 @@ func unavailableReason(reason string) string {
 	case strings.HasPrefix(reason, "P2P payment unavailable: "):
 		return "в заявках нет выбранного способа оплаты «" + strings.TrimPrefix(reason, "P2P payment unavailable: ") + "». Выберите доступный банк через /banks."
 	case strings.Contains(reason, "insufficient liquidity"):
-		return "нет заявки под эту сумму и выбранные фильтры (банк, лимиты, резерв, надёжность). Попробуйте другую сумму или /banks."
+		return "нет заявки под эту сумму и выбранные фильтры (страна KYC, банк, лимиты, резерв, надёжность). Проверьте /settings или измените сумму."
 	case strings.Contains(reason, "below withdrawal minimum"):
 		return "сумма ниже минимального вывода биржи."
 	case strings.Contains(reason, "below market minimum"):

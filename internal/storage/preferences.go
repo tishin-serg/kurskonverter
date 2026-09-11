@@ -8,6 +8,7 @@ import (
 )
 
 type Preferences struct {
+	BybitCountry  string
 	MinOrders     *int
 	MinSuccess    string
 	AllowFallback bool
@@ -17,7 +18,7 @@ func (s *Store) Preferences(ctx context.Context, user int64) (Preferences, error
 	p := Preferences{AllowFallback: true}
 	var orders sql.NullInt64
 	var success sql.NullString
-	err := s.DB.QueryRowContext(ctx, "SELECT min_orders,min_success,allow_fallback FROM user_preferences WHERE user_id=?", user).Scan(&orders, &success, &p.AllowFallback)
+	err := s.DB.QueryRowContext(ctx, "SELECT min_orders,min_success,allow_fallback,bybit_country FROM user_preferences WHERE user_id=?", user).Scan(&orders, &success, &p.AllowFallback, &p.BybitCountry)
 	if err == sql.ErrNoRows {
 		return p, nil
 	}
@@ -29,7 +30,7 @@ func (s *Store) Preferences(ctx context.Context, user int64) (Preferences, error
 	return p, err
 }
 func (s *Store) SetPreference(ctx context.Context, user int64, key, value string) error {
-	column := map[string]string{"orders": "min_orders", "success": "min_success", "fallback": "allow_fallback"}[key]
+	column := map[string]string{"orders": "min_orders", "success": "min_success", "fallback": "allow_fallback", "country": "bybit_country"}[key]
 	if column == "" {
 		return fmt.Errorf("unknown preference")
 	}

@@ -166,4 +166,25 @@ func TestNavigationAndPersonalSettings(t *testing.T) {
 	if sends != beforeSends+1 || edits != beforeEdits+1 {
 		t.Fatal("navigation within the new panel must edit it")
 	}
+	click("input:country")
+	send("Российская федерация")
+	f, e = u.personalFilter(ctx, 1)
+	if e != nil || f.BybitCountry != "RUS" || !strings.Contains(last, "Россия (RUS)") {
+		t.Fatal(f, e, last)
+	}
+	other, e = u.personalFilter(ctx, 2)
+	if e != nil || other.BybitCountry != "" {
+		t.Fatal("country leaked to another user", other, e)
+	}
+	click("input:country")
+	send("123")
+	f, _ = u.personalFilter(ctx, 1)
+	if f.BybitCountry != "RUS" {
+		t.Fatal("invalid input changed country")
+	}
+	click("set:country:clear")
+	f, _ = u.personalFilter(ctx, 1)
+	if f.BybitCountry != "" {
+		t.Fatal("country not cleared")
+	}
 }

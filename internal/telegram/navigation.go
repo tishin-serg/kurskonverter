@@ -94,6 +94,7 @@ func (u *UI) personalFilter(ctx context.Context, user int64) (domain.Filter, err
 		}
 	}
 	f.DisallowFallback = !p.AllowFallback
+	f.BybitCountry = p.BybitCountry
 	legacy, err := u.Storage.Payment(ctx, user)
 	if err != nil {
 		return f, err
@@ -138,15 +139,22 @@ func (u *UI) settings(ctx context.Context, b *bot.Bot, user, chat int64, note st
 		fallback = "исключены"
 	}
 	text := fmt.Sprintf("⚙️ Настройки\n\nКурс за 1 BTC: %s\nСделок у продавца: от %d\nУспешных операций: от %s%%\nBybit: %s\nWallet: %s\nРезервные комиссии: %s", rate, f.MinOrdersCount, f.MinCompletionRate.String(), label("bybit"), label("wallet"), fallback)
+	text += "\nСтрана KYC Bybit: " + countryLabel(f.BybitCountry)
+	if f.BybitCountry == "" {
+		text += "\nОбъявления с ограничением страны исключены."
+	}
 	if note != "" {
 		text = note + "\n\n" + text
 	}
-	u.panel(ctx, b, user, chat, "settings", text, keyboard(one("Курс BTC/RUB", "input:rate"), []models.InlineKeyboardButton{button("Число сделок", "input:orders"), button("Успешность, %", "input:success")}, one("Банки P2P", "banks"), one("Резервные комиссии", "fallback"), one("🏠 Главное меню", "home")))
+	u.panel(ctx, b, user, chat, "settings", text, keyboard(one("Курс BTC/RUB", "input:rate"), []models.InlineKeyboardButton{button("Число сделок", "input:orders"), button("Успешность, %", "input:success")}, one("Банки P2P", "banks"), one("Страна KYC Bybit", "input:country"), one("Резервные комиссии", "fallback"), one("🏠 Главное меню", "home")))
 }
 func (u *UI) inputPanel(ctx context.Context, b *bot.Bot, user, chat int64, kind, note string) {
 	var text string
 	var rows [][]models.InlineKeyboardButton
 	switch kind {
+	case "country":
+		text = "Страна KYC Bybit\n\nУкажите страну верификации аккаунта, а не страну банка или VPN.\nНапример: RUS — Россия, GEO — Грузия.\n\nФильтр проверяет регион объявления. Остальные требования продавца проверьте на Bybit."
+		rows = append(rows, []models.InlineKeyboardButton{button("Россия", "set:country:RUS"), button("Грузия", "set:country:GEO")}, one("Страна не задана", "set:country:clear"))
 	case "rate":
 		text = "Курс BTC/RUB\n\nСколько рублей за 1 BTC?\nНапример: 7000000\n\nИспользуется для рублёвого эквивалента, а не как цена покупки."
 	case "orders":
@@ -169,6 +177,12 @@ func (u *UI) saveSetting(ctx context.Context, b *bot.Bot, user, chat int64, kind
 	value = strings.TrimSpace(value)
 	var err error
 	switch kind {
+	case "country":
+		var country string
+		country, err = parseCountry(value)
+		if err == nil {
+			err = u.Storage.SetPreference(ctx, user, kind, country)
+		}
 	case "rate":
 		var d decimal.Decimal
 		d, err = parseRate(value)

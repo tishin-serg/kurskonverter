@@ -37,6 +37,9 @@ func CalculateUSD(target decimal.Decimal, s *domain.MarketSnapshot, f domain.Fil
 		}
 	}
 	for _, sell := range usd.Value {
+		if !domain.CountryEligible(sell, f) {
+			continue
+		}
 		if !sell.TakerSells || sell.Fiat != "USD" || sell.Asset != "USDT" || !domain.PaymentMatches(domain.BybitTBCPayment, sell.PaymentMethods) || !sell.Price.IsPositive() || !sell.AssetStep.IsPositive() || sell.MinFiat.IsNegative() || sell.MaxFiat.LessThan(sell.MinFiat) || sell.CompletionRate.LessThan(f.MinCompletionRate) || sell.CompletionRate.GreaterThan(decimal.NewFromInt(100)) || sell.OrdersCount < f.MinOrdersCount || (f.DisallowFallback && sell.FeeFallback) {
 			continue
 		}
@@ -58,7 +61,7 @@ func CalculateUSD(target decimal.Decimal, s *domain.MarketSnapshot, f domain.Fil
 		}
 	}
 	if best.RUBRequired.IsZero() {
-		return best, fmt.Errorf("нет пары заявок под эту сумму: проверьте банк оплаты, лимиты и фильтры продавцов. Зачисление — только TBC Bank")
+		return best, fmt.Errorf("нет пары заявок под эту сумму: проверьте страну KYC Bybit, банк оплаты, лимиты и фильтры продавцов. Зачисление — только TBC Bank")
 	}
 	return best, nil
 }

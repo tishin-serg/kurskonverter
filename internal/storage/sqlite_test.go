@@ -21,6 +21,9 @@ func TestStorage(t *testing.T) {
 	if e = s.SetPayment(ctx, 1, "bank"); e != nil {
 		t.Fatal(e)
 	}
+	if e = s.SetPreference(ctx, 1, "country", "RUS"); e != nil {
+		t.Fatal(e)
+	}
 	id, e := s.Save(ctx, 1, ".01", route.Result{})
 	if e != nil {
 		t.Fatal(e)
@@ -34,6 +37,10 @@ func TestStorage(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer s.DB.Close()
+	prefs, e := s.Preferences(ctx, 1)
+	if e != nil || prefs.BybitCountry != "RUS" {
+		t.Fatal("country lost after restart", prefs, e)
+	}
 	v, e := s.Payment(ctx, 1)
 	if e != nil || v != "bank" {
 		t.Fatal(v, e)
