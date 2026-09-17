@@ -106,6 +106,11 @@ func (u *UI) personalFilter(ctx context.Context, user int64) (domain.Filter, err
 		f.PaymentMethod = ""
 	}
 	f.PaymentByProvider, err = u.Storage.ProviderPayments(ctx, user)
+	if err == nil {
+		if _, ok := f.PaymentByProvider["wallet"]; !ok {
+			f.PaymentByProvider["wallet"] = ""
+		}
+	}
 	return f, err
 }
 func (u *UI) settings(ctx context.Context, b *bot.Bot, user, chat int64, note string) {

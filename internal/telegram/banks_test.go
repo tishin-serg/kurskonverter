@@ -38,6 +38,15 @@ func TestIndependentBankSelectionAndAny(t *testing.T) {
 	m := market.New()
 	m.Update(func(s *domain.MarketSnapshot) { *s = *demo.Snapshot(time.Now()) })
 	u := &UI{Market: m, Storage: db, Engine: route.DefaultEngine(), Filter: domain.Filter{PaymentMethod: "Tbank"}, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	withoutWalletBank, e := u.personalFilter(ctx, 1)
+	if e != nil {
+		t.Fatal(e)
+	}
+	withoutWalletBank.PaymentMethod = "Tbank"
+	before := u.Engine.Calculate(ctx, decimal.New(1, -2), m.Read(), withoutWalletBank, time.Now())
+	if len(before.Quotes) != 1 || before.Quotes[0].RouteID != "Wallet → GRAM → OKX" {
+		t.Fatal("global Bybit payment filter leaked into Wallet", before)
+	}
 	choices := u.bankChoices("wallet")
 	if len(choices) != 1 {
 		t.Fatal(choices)
