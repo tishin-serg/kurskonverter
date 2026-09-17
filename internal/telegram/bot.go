@@ -284,6 +284,6 @@ func (u *UI) callback(ctx context.Context, b *bot.Bot, q *models.CallbackQuery) 
 			u.home(ctx, b, q.From.ID, chat, "Этот маршрут больше недоступен. Начните новый расчёт.")
 			return
 		}
-		u.send(ctx, b, chat, "Сохранённый расчёт\n\n"+equivalentText(r.Equivalent)+Breakdown(r.Quotes[i], u.Demo), keyboard([]models.InlineKeyboardButton{button("Обновить", fmt.Sprintf("r:%d", id)), button("🏠 Меню", "home")}))
+		u.send(ctx, b, chat, "Сохранённый расчёт\n\n⚠️ Это снимок заявки на момент расчёта. Доступность продавца могла измениться.\nНажмите «Пересчитать сейчас», чтобы применить текущие фильтры региона и свежие данные.\n\n"+equivalentText(r.Equivalent)+Breakdown(r.Quotes[i], u.Demo), keyboard([]models.InlineKeyboardButton{button("Пересчитать сейчас", fmt.Sprintf("r:%d", id)), button("🏠 Меню", "home")}))
 	}
 }

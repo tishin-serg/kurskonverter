@@ -8,13 +8,9 @@ func CountryEligible(o P2POffer, f Filter) bool {
 	if !strings.EqualFold(o.Provider, "Bybit") || len(o.BlockedCountries) == 0 {
 		return true
 	}
-	if f.BybitCountry == "" {
-		return false
-	}
-	for _, country := range o.BlockedCountries {
-		if country == f.BybitCountry {
-			return false
-		}
-	}
-	return true
+	// Bybit's public ad endpoint does not expose the caller's effective region.
+	// An active nationalLimit can still be rejected by the account, even when
+	// the configured KYC country is absent from the returned list. Do not show
+	// such an ad as executable; only unrestricted ads are safe to calculate.
+	return false
 }
