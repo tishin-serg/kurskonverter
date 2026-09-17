@@ -184,6 +184,9 @@ func (u *UI) quote(ctx context.Context, b *bot.Bot, user, chat int64, text strin
 		u.send(ctx, b, chat, "Не удалось прочитать настройки банков.", nil)
 		return
 	}
+	if _, ok := f.PaymentByProvider["wallet"]; !ok {
+		f.PaymentByProvider["wallet"] = ""
+	}
 	r := u.Engine.Calculate(ctx, target, u.Market.Read(), f, time.Now())
 	r.Equivalent = equivalent
 	id, e := u.Storage.Save(ctx, user, target.String(), r)
