@@ -9,7 +9,7 @@ ARG COMMIT=unknown
 ARG DATE=unknown
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.Date=${DATE}" -o /out/bot ./cmd/bot
 
-FROM alpine:3.23
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates && addgroup -g 10001 bot && adduser -D -u 10001 -G bot bot && mkdir /data && chown bot:bot /data
 COPY --from=builder /out/bot /usr/local/bin/bot
 USER 10001:10001
